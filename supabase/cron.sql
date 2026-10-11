@@ -7,10 +7,10 @@ create extension if not exists pg_net;
 select vault.create_secret('https://YOUR-PROJECT-REF.supabase.co', 'project_url');
 select vault.create_secret('SAME-VALUE-AS-CRON_SECRET', 'cron_secret');
 
--- Every 5 minutes
+-- Every minute (well within the free tier: ~43k invocations a month)
 select cron.schedule(
   'send-chore-reminders',
-  '*/5 * * * *',
+  '* * * * *',
   $$
   select net.http_post(
     url     := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')

@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, type Chore, type Household, type Member, type Repeat } from './supabase'
+import { supabase, type Chore, type Household, type Member, type Repeat, type ShoppingItem } from './supabase'
 
 export const keys = {
   household: ['household'] as const,
   members: (hid: string) => ['members', hid] as const,
   chores: (hid: string) => ['chores', hid] as const,
+  items: (hid: string) => ['items', hid] as const,
 }
 
 function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
@@ -64,11 +65,17 @@ export function useRealtime(hid: string) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chores', filter: `household_id=eq.${hid}` }, () =>
         qc.invalidateQueries({ queryKey: keys.chores(hid) }),
       )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items', filter: `household_id=eq.${hid}` }, () =>
+        qc.invalidateQueries({ queryKey: keys.items(hid) }),
+      )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `household_id=eq.${hid}` }, () =>
         qc.invalidateQueries({ queryKey: keys.members(hid) }),
       )
       .subscribe()
-    const onFocus = () => qc.invalidateQueries({ queryKey: keys.chores(hid) })
+    const onFocus = () => {
+      qc.invalidateQueries({ queryKey: keys.chores(hid) })
+      qc.invalidateQueries({ queryKey: keys.items(hid) })
+    }
     window.addEventListener('focus', onFocus)
     return () => {
       supabase.removeChannel(channel)
@@ -156,4 +163,91 @@ export function useDeleteChore(hid: string) {
     mutationFn: async (id: string) => unwrap(await supabase.from('chores').delete().eq('id', id)),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.chores(hid) }),
   })
+}
+
+// ─── To buy ──────────────────────────────────────────────────────────────
+
+export function useItems(hid: string) {
+  return useQuery({
+    queryKey: keys.items(hid),
+    queryFn: async () =>
+      unwrap(
+        await supabase
+          .from('shopping_items')
+          .select('*')
+          .eq('household_id', hid)
+          .order('created_at'),
+      ) as ShoppingItem[],
+  })
+}
+
+/** Optimistically patches items in the cache, rolling back on error. */
+function useItemMutation<V>(
+  hid: string,
+  fn: (v: V) => Promise<unknown>,
+  patch?: (list: ShoppingItem[], v: V) => ShoppingItem[],
+) {
+  const qc = useQueryClient()
+  const key = keys.items(hid)
+  return useMutation({
+    mutationFn: fn,
+    onMutate: async (v: V) => {
+      if (!patch) return {}
+      await qc.cancelQueries({ queryKey: key })
+      const prev = qc.getQueryData<ShoppingItem[]>(key)
+      if (prev) qc.setQueryData(key, patch(prev, v))
+      return { prev }
+    },
+    onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(key, ctx.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  })
+}
+
+export function useAddItem(hid: string) {
+  return useItemMutation(
+    hid,
+    async (v: { name: string; assignee_id?: string | null }) =>
+      unwrap(await supabase.from('shopping_items').insert({ household_id: hid, name: v.name, assignee_id: v.assignee_id ?? null })),
+    (list, v) => [
+      ...list,
+      {
+        id: `temp-${Date.now()}`, household_id: hid, name: v.name, note: null, assignee_id: v.assignee_id ?? null,
+        bought_at: null, bought_by: null, created_by: '', created_at: new Date().toISOString(),
+      },
+    ],
+  )
+}
+
+export function useToggleBought(hid: string) {
+  return useItemMutation(
+    hid,
+    async (id: string) => unwrap(await supabase.rpc('toggle_bought', { p_item_id: id })),
+    (list, id) => list.map((i) => (i.id === id ? { ...i, bought_at: i.bought_at ? null : new Date().toISOString() } : i)),
+  )
+}
+
+export function useAssignItems(hid: string) {
+  return useItemMutation(
+    hid,
+    async (v: { ids: string[]; assignee: string | null }) =>
+      unwrap(await supabase.rpc('assign_items', { p_item_ids: v.ids, p_assignee: v.assignee })),
+    (list, v) => list.map((i) => (v.ids.includes(i.id) && !i.bought_at ? { ...i, assignee_id: v.assignee } : i)),
+  )
+}
+
+export function useUpdateItem(hid: string) {
+  return useItemMutation(
+    hid,
+    async (v: { id: string; name: string; note: string | null }) =>
+      unwrap(await supabase.from('shopping_items').update({ name: v.name, note: v.note }).eq('id', v.id)),
+    (list, v) => list.map((i) => (i.id === v.id ? { ...i, name: v.name, note: v.note } : i)),
+  )
+}
+
+export function useDeleteItems(hid: string) {
+  return useItemMutation(
+    hid,
+    async (ids: string[]) => unwrap(await supabase.from('shopping_items').delete().in('id', ids)),
+    (list, ids) => list.filter((i) => !ids.includes(i.id)),
+  )
 }

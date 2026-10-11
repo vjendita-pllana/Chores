@@ -16,6 +16,7 @@ Push service ◀── web-push ── send-reminders edge function ◀── pg
 
 - `claim_due_reminders()` marks chores as reminded in the same statement it returns them, so overlapping cron runs never send twice.
 - Chores more than a day late get one extra "Still waiting" nudge.
+- **To buy:** anyone adds items; tap *Select* to hand several to one person. `assign_items()` writes a message to `push_queue`, which the same cron function sends ("Vjendita asked you to buy 3 things").
 - Recurring chores keep a single row: completing one logs it to `chore_log`, moves `due_at` forward (in the household's time zone, so 19:00 stays 19:00 across DST) and, with *Take turns* on, passes it to the next person.
 - RLS: people only see their own household. Assignees must be household members (enforced by trigger).
 
@@ -24,7 +25,7 @@ Push service ◀── web-push ── send-reminders edge function ◀── pg
 ### 1. Supabase project
 
 1. Create a project at supabase.com.
-2. Run `supabase/migrations/20261012000000_init.sql` in the SQL editor (or `supabase link` + `supabase db push`).
+2. Run both files in `supabase/migrations/` in the SQL editor, in order (or `supabase link` + `supabase db push`).
 3. **Auth → Email templates → Magic Link:** add `{{ .Token }}` to the body, e.g. `Your code is {{ .Token }}`. The app signs in with a 6-digit code, because on iPhone a magic link would open Safari and sign in there instead of the Home Screen app.
 4. **Auth → SMTP:** set up custom SMTP (Resend, Postmark, etc.). The built-in sender is heavily rate-limited and, as far as I know, only delivers to your project's team members, so your roommates wouldn't get their codes.
 5. Household time zone defaults to `Europe/Belgrade`. Change the column default in the migration if needed.
@@ -54,7 +55,7 @@ supabase functions deploy send-reminders --no-verify-jwt
 
 ### 4. Cron
 
-Open `supabase/cron.sql`, fill in your project URL and the same `CRON_SECRET`, and run it in the SQL editor. It calls the function every 5 minutes.
+Open `supabase/cron.sql`, fill in your project URL and the same `CRON_SECRET`, and run it in the SQL editor. It calls the function every minute.
 
 ### 5. Frontend
 

@@ -1,0 +1,167 @@
+import { useEffect, useMemo, useState } from 'react'
+import type { Chore, Member } from '../lib/supabase'
+import { dueLabel, groupOf, repeatLabel, type Group } from '../lib/format'
+import { useChores, useCompleteChore } from '../lib/queries'
+import { ChoreSheet } from './ChoreSheet'
+import { Avatar } from './Sheet'
+
+const groupTitle: Record<Group, string> = {
+  overdue: 'Overdue',
+  today: 'Today',
+  upcoming: 'Coming up',
+  done: 'Done',
+}
+
+export function ChoresView({ householdId: hid, members, userId }: {
+  householdId: string
+  members: Member[]
+  userId: string
+}) {
+  const { data: chores = [], isLoading } = useChores(hid)
+  const complete = useCompleteChore(hid)
+
+  const [filter, setFilter] = useState<'mine' | 'all'>('all')
+  const [editing, setEditing] = useState<Chore | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  const nameOf = useMemo(() => {
+    const map = new Map(members.map((m) => [m.user_id, m.display_name]))
+    return (id: string | null) => (id ? (map.get(id) ?? 'Someone') : 'Anyone')
+  }, [members])
+
+  // Opened from a notification: /?chore=<id>
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('chore')
+    if (!id || !chores.length) return
+    const c = chores.find((x) => x.id === id)
+    if (c) {
+      setEditing(c)
+      setSheetOpen(true)
+    }
+    history.replaceState(null, '', '/')
+  }, [chores])
+
+  const grouped = useMemo(() => {
+    const visible = chores.filter((c) => filter === 'all' || c.assignee_id === userId)
+    const recentCutoff = Date.now() - 3 * 24 * 60 * 60 * 1000
+    const g: Record<Group, Chore[]> = { overdue: [], today: [], upcoming: [], done: [] }
+    for (const c of visible) {
+      const group = groupOf(c)
+      if (group === 'done' && new Date(c.done_at!).getTime() < recentCutoff) continue
+      g[group].push(c)
+    }
+    g.done.sort((a, b) => b.done_at!.localeCompare(a.done_at!))
+    return g
+  }, [chores, filter, userId])
+
+  const empty = !isLoading && Object.values(grouped).every((l) => l.length === 0)
+
+  return (
+    <>
+      <Segmented value={filter} onChange={setFilter}
+        options={[{ v: 'all', label: 'Everyone' }, { v: 'mine', label: 'Mine' }]} />
+
+      {isLoading && <p className="text-muted">Loading…</p>}
+      {empty && (
+        <div className="mt-16 text-center">
+          <p className="font-display text-xl">Nothing to do.</p>
+          <p className="mt-1 text-muted">Add a chore with the + button.</p>
+        </div>
+      )}
+
+      {(Object.keys(grouped) as Group[]).map((g) =>
+        grouped[g].length ? (
+          <section key={g} className="mb-6">
+            <h2 className={`mb-2 text-xs font-semibold uppercase tracking-wider ${g === 'overdue' ? 'text-clay' : 'text-muted'}`}>
+              {groupTitle[g]} · {grouped[g].length}
+            </h2>
+            <ul className="space-y-2">
+              {grouped[g].map((c) => (
+                <ChoreRow key={c.id} chore={c} group={g} assignee={nameOf(c.assignee_id)}
+                  isMine={c.assignee_id === userId}
+                  onToggle={() => complete.mutate(c.id)}
+                  onOpen={() => { setEditing(c); setSheetOpen(true) }} />
+              ))}
+            </ul>
+          </section>
+        ) : null,
+      )}
+
+      <button
+        onClick={() => { setEditing(null); setSheetOpen(true) }}
+        aria-label="Add chore"
+        className="fixed bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.5rem)] right-5 z-20 flex h-14 w-14 items-center justify-center rounded-2xl bg-moss text-3xl leading-none text-paper shadow-lg shadow-moss/30 transition active:scale-95"
+      >
+        +
+      </button>
+
+      <ChoreSheet open={sheetOpen} onClose={() => setSheetOpen(false)} chore={editing}
+        members={members} householdId={hid} userId={userId} />
+    </>
+  )
+}
+
+export function Segmented<T extends string>({ value, onChange, options }: {
+  value: T
+  onChange: (v: T) => void
+  options: { v: T; label: string }[]
+}) {
+  return (
+    <div className="mb-5 inline-flex rounded-xl bg-line/60 p-1 text-sm font-medium">
+      {options.map((o) => (
+        <button key={o.v} onClick={() => onChange(o.v)}
+          className={`rounded-lg px-4 py-1.5 transition ${value === o.v ? 'bg-card shadow-sm' : 'text-muted'}`}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ChoreRow({ chore, group, assignee, isMine, onToggle, onOpen }: {
+  chore: Chore
+  group: Group
+  assignee: string
+  isMine: boolean
+  onToggle: () => void
+  onOpen: () => void
+}) {
+  const done = group === 'done'
+  return (
+    <li className={`flex items-center gap-3 rounded-2xl border bg-card px-3 py-3 ${
+      group === 'overdue' ? 'border-clay/30' : 'border-line'} ${done ? 'opacity-60' : ''}`}>
+      <CheckCircle checked={done} disabled={done} onClick={onToggle}
+        label={done ? 'Done' : `Mark "${chore.title}" done`} />
+      <button onClick={onOpen} className="min-w-0 flex-1 text-left">
+        <span className={`block truncate font-medium ${done ? 'line-through' : ''}`}>{chore.title}</span>
+        <span className={`block text-sm ${group === 'overdue' ? 'text-clay' : 'text-muted'}`}>
+          {dueLabel(chore.due_at)}
+          {chore.repeat !== 'none' && ` · ${repeatLabel[chore.repeat]}${chore.rotate ? ', taking turns' : ''}`}
+        </span>
+      </button>
+      <span className="flex items-center gap-1.5 text-sm text-muted">
+        <span className="hidden min-[380px]:inline">{isMine ? 'Me' : assignee}</span>
+        <Avatar name={assignee} active={isMine} />
+      </span>
+    </li>
+  )
+}
+
+export function CheckCircle({ checked, onClick, label, disabled }: {
+  checked: boolean
+  onClick: () => void
+  label: string
+  disabled?: boolean
+}) {
+  return (
+    <button onClick={onClick} disabled={disabled} aria-label={label} aria-pressed={checked}
+      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${
+        checked ? 'border-moss bg-moss text-paper' : 'border-muted/40 active:bg-moss-soft'}`}>
+      {checked && (
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 10.5l3.5 3.5L15 7" />
+        </svg>
+      )}
+    </button>
+  )
+}

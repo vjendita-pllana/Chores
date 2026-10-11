@@ -43,3 +43,15 @@ export type Chore = {
   done_by: string | null
   created_by: string
 }
+
+export type ShoppingItem = {
+  id: string
+  household_id: string
+  name: string
+  note: string | null
+  assignee_id: string | null
+  bought_at: string | null
+  bought_by: string | null
+  created_by: string
+  created_at: string
+}
