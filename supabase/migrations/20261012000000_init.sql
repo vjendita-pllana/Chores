@@ -8,7 +8,7 @@ create table public.households (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   timezone    text not null default 'Europe/Belgrade',
-  invite_code text not null unique default upper(substr(encode(gen_random_bytes(6), 'hex'), 1, 6)),
+  invite_code text not null unique default upper(substr(encode(extensions.gen_random_bytes(6), 'hex'), 1, 6)),
   created_by  uuid not null references auth.users (id) on delete cascade,
   created_at  timestamptz not null default now()
 );

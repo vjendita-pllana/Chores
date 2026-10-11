@@ -1,6 +1,10 @@
 import { supabase } from './supabase'
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string
+// Public half of the VAPID pair stored in Supabase Vault (safe to ship).
+// Set VITE_VAPID_PUBLIC_KEY to override it, e.g. for another Supabase project.
+const VAPID_PUBLIC_KEY =
+  import.meta.env.VITE_VAPID_PUBLIC_KEY ||
+  'BG1Tb1UxWkzhbrhXgiriA7NfARKVvapqlozen7iESTtAW2ZGBxSjxQpEpksmsf3HXIdbq5eoF1T7EJ32eZTWPnM'
 
 export type PushState =
   | 'unsupported' // browser has no Push API

@@ -22,50 +22,23 @@ Push service ◀── web-push ── send-reminders edge function ◀── pg
 
 ## Setup
 
-### 1. Supabase project
+The live project (Supabase `yyrzougkeircwksnmzaq`, created through Vercel's Supabase integration) is already set up: migrations applied, `send-reminders` deployed, Vault secrets stored, cron running every minute. To set up a fresh project:
 
-1. Create a project at supabase.com.
-2. Run both files in `supabase/migrations/` in the SQL editor, in order (or `supabase link` + `supabase db push`).
-3. **Auth → Email templates → Magic Link:** add `{{ .Token }}` to the body, e.g. `Your code is {{ .Token }}`. The app signs in with a 6-digit code, because on iPhone a magic link would open Safari and sign in there instead of the Home Screen app.
-4. **Auth → SMTP:** set up custom SMTP (Resend, Postmark, etc.). The built-in sender is heavily rate-limited and, as far as I know, only delivers to your project's team members, so your roommates wouldn't get their codes.
-5. Household time zone defaults to `Europe/Belgrade`. Change the column default in the migration if needed.
+1. Run the files in `supabase/migrations/` in order.
+2. Generate a VAPID pair (`npx web-push generate-vapid-keys`) and store the Vault secrets listed at the top of `20261012020000_push_config.sql`.
+3. Deploy `supabase/functions/send-reminders` with JWT verification **off** (it checks the Vault `cron_secret` itself). No function secrets are needed.
+4. Run `supabase/cron.sql`.
+5. Put the VAPID public key in `src/lib/push.ts` or `VITE_VAPID_PUBLIC_KEY`.
 
-### 2. VAPID keys
+### Auth settings (dashboard only)
 
-```bash
-npx web-push generate-vapid-keys
-```
+- **Authentication → Emails → Templates → Magic Link:** use a body like `<p>Your Chores code is <strong>{{ .Token }}</strong></p>`. The app signs in with the 6-digit code, because on iPhone a link would open Safari instead of the Home Screen app.
+- **Authentication → URL Configuration → Site URL:** your Vercel URL.
+- **Authentication → Emails → SMTP Settings:** add custom SMTP (e.g. Resend). The built-in sender is heavily rate-limited and may only deliver to project team members.
 
-The public key goes in the app's env, the private key only in Supabase secrets.
+### Frontend
 
-### 3. Edge function
-
-```bash
-supabase secrets set \
-  VAPID_PUBLIC_KEY=... \
-  VAPID_PRIVATE_KEY=... \
-  VAPID_SUBJECT=mailto:you@example.com \
-  APP_URL=https://your-app.vercel.app \
-  CRON_SECRET=$(openssl rand -hex 24)
-
-supabase functions deploy send-reminders --no-verify-jwt
-```
-
-`--no-verify-jwt` is needed because the cron job authenticates with `CRON_SECRET`, not a user token. The function rejects any request without it.
-
-### 4. Cron
-
-Open `supabase/cron.sql`, fill in your project URL and the same `CRON_SECRET`, and run it in the SQL editor. It calls the function every minute.
-
-### 5. Frontend
-
-```bash
-cp .env.example .env.local   # fill in URL, anon/publishable key, VAPID public key
-npm install
-npm run dev
-```
-
-Deploy to Vercel with the same three `VITE_` env vars. Push needs HTTPS, which Vercel gives you (localhost also works for testing on desktop).
+Vercel's Supabase integration provides `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`; `vite.config.ts` maps them to `VITE_*`. For local dev, copy `.env.example` to `.env.local`.
 
 ## Getting roommates on
 

@@ -1,13 +1,10 @@
--- Run once in the Supabase SQL editor AFTER deploying the send-reminders function.
--- Replace the two placeholder values first.
+-- Run once after deploying send-reminders (deploy with JWT verification off:
+-- the function checks the Vault cron_secret itself).
+-- Requires the Vault secrets listed in migrations/20261012020000_push_config.sql.
 
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
-select vault.create_secret('https://YOUR-PROJECT-REF.supabase.co', 'project_url');
-select vault.create_secret('SAME-VALUE-AS-CRON_SECRET', 'cron_secret');
-
--- Every minute (well within the free tier: ~43k invocations a month)
 select cron.schedule(
   'send-chore-reminders',
   '* * * * *',
@@ -25,8 +22,5 @@ select cron.schedule(
   $$
 );
 
--- To check it's running:
---   select * from cron.job_run_details order by start_time desc limit 10;
---   select * from net._http_response order by created desc limit 10;
--- To stop it:
---   select cron.unschedule('send-chore-reminders');
+-- Check it:   select status_code, content from net._http_response order by created desc limit 5;
+-- Stop it:    select cron.unschedule('send-chore-reminders');
