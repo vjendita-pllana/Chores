@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-paper: #f6f3ee;
+  --color-card: #fffdf9;
+  --color-ink: #1f2420;
+  --color-muted: #6b6f68;
+  --color-line: #e4ded4;
+  --color-moss: #2f4a3a;
+  --color-moss-soft: #dfe8e0;
+  --color-clay: #b4532a;
+  --color-clay-soft: #f6e2d6;
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+.safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+input,
+select,
+textarea {
+  font-size: 16px; /* stops iOS zooming into fields */
+}
+
+@utility field {
+  @apply w-full rounded-xl border border-line bg-card px-3.5 py-3 outline-none transition focus:border-moss;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition active:scale-[0.98] disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-moss text-paper;
+}
+@utility btn-ghost {
+  @apply btn border border-line bg-card text-ink;
+}
+@utility label {
+  @apply mb-1.5 block text-sm font-medium text-muted;
+}
