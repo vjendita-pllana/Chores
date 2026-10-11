@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-const VAPID_PUBLIC_KEY = (import.meta.env.VITE_VAPID_PUBLIC_KEY || import.meta.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) as string
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string
 
 export type PushState =
   | 'unsupported' // browser has no Push API
