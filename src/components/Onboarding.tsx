@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCreateHousehold, useJoinHousehold } from '../lib/queries'
+import { friendlyError } from '../lib/format'
 
 export function Onboarding() {
   const inviteFromUrl = new URLSearchParams(location.search).get('join') ?? ''
@@ -64,7 +65,7 @@ export function Onboarding() {
         <button className="btn-primary w-full" disabled={pending}>
           {pending ? 'One moment…' : mode === 'create' ? 'Create' : 'Join'}
         </button>
-        {error && <p className="rounded-lg bg-clay-soft px-3 py-2 text-sm text-clay">{error.message}</p>}
+        {error && <p className="rounded-lg bg-clay-soft px-3 py-2 text-sm text-clay">{friendlyError(error)}</p>}
       </form>
 
       <button className="mt-10 text-sm text-muted" onClick={() => supabase.auth.signOut()}>

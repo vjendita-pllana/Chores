@@ -56,3 +56,16 @@ textarea {
 @utility label {
   @apply mb-1.5 block text-sm font-medium text-muted;
 }
+
+/* iOS gives date inputs a fixed intrinsic width that overflows narrow screens */
+.date-field {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  display: block;
+  text-align: left;
+}
+.date-field::-webkit-date-and-time-value {
+  text-align: left;
+}

@@ -3,6 +3,7 @@ import type { Chore, Member, Repeat } from '../lib/supabase'
 import { defaultDue, repeatLabel, toLocalInput } from '../lib/format'
 import { useDeleteChore, useReopenChore, useSaveChore } from '../lib/queries'
 import { Avatar, Sheet } from './Sheet'
+import { friendlyError } from '../lib/format'
 
 const reminderOptions = [
   { v: 0, label: 'At due time' },
@@ -103,7 +104,7 @@ function ChoreForm({ chore, members, householdId, userId, onDone }: {
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className="label" htmlFor="due">When</label>
-          <input id="due" className="field" type="datetime-local" required value={due}
+          <input id="due" className="field date-field" type="datetime-local" required value={due}
             onChange={(e) => setDue(e.target.value)} />
         </div>
         <div>
@@ -137,7 +138,7 @@ function ChoreForm({ chore, members, householdId, userId, onDone }: {
           onChange={(e) => setNotes(e.target.value)} />
       </div>
 
-      {save.error && <p className="rounded-lg bg-clay-soft px-3 py-2 text-sm text-clay">{save.error.message}</p>}
+      {save.error && <p className="rounded-lg bg-clay-soft px-3 py-2 text-sm text-clay">{friendlyError(save.error)}</p>}
 
       <button className="btn-primary w-full" disabled={save.isPending}>
         {save.isPending ? 'Saving…' : chore ? 'Save' : 'Add chore'}

@@ -44,3 +44,16 @@ export function defaultDue() {
 }
 
 export const repeatLabel = { none: 'Once', daily: 'Every day', weekly: 'Every week', monthly: 'Every month' } as const
+
+/** Dropped connection: iOS Safari says "Load failed", Chrome "Failed to fetch".
+ *  supabase-js passes these on as a plain Error with message "TypeError: Load failed". */
+export function isNetworkError(e: unknown) {
+  return e instanceof Error && /load failed|failed to fetch|networkerror|network request failed/i.test(e.message)
+}
+
+export function friendlyError(e: Error) {
+  if (isNetworkError(e)) {
+    return "Couldn't reach the server. Check your connection and try again."
+  }
+  return e.message
+}

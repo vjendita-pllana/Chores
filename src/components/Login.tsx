@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { friendlyError } from '../lib/format'
 
 // Uses a 6-digit email code instead of a magic link: on iPhone, a link would open
 // in Safari and sign in there, not in the installed Home Screen app.
@@ -19,7 +20,7 @@ export function Login() {
       options: { shouldCreateUser: true },
     })
     setBusy(false)
-    if (error) setError(error.message)
+    if (error) setError(friendlyError(error))
     else setStep('code')
   }
 
@@ -29,7 +30,7 @@ export function Login() {
     setError(null)
     const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' })
     setBusy(false)
-    if (error) setError(error.message)
+    if (error) setError(friendlyError(error))
   }
 
   return (
