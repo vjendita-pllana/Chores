@@ -21,6 +21,13 @@ export function ChoresView({ householdId: hid, members, userId }: {
   const complete = useCompleteChore(hid)
 
   const [filter, setFilter] = useState<'mine' | 'all'>('all')
+  const [range, setRangeState] = useState<'today' | 'all'>(() => {
+    try { return localStorage.getItem('chores.range') === 'all' ? 'all' : 'today' } catch { return 'today' }
+  })
+  const setRange = (v: 'today' | 'all') => {
+    setRangeState(v)
+    try { localStorage.setItem('chores.range', v) } catch { /* storage unavailable */ }
+  }
   const [editing, setEditing] = useState<Chore | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
@@ -43,28 +50,37 @@ export function ChoresView({ householdId: hid, members, userId }: {
 
   const grouped = useMemo(() => {
     const visible = chores.filter((c) => filter === 'all' || c.assignee_id === userId)
-    const recentCutoff = Date.now() - 3 * 24 * 60 * 60 * 1000
+    const startToday = new Date()
+    startToday.setHours(0, 0, 0, 0)
+    const recentCutoff = range === 'today'
+      ? startToday.getTime()
+      : Date.now() - 3 * 24 * 60 * 60 * 1000
     const g: Record<Group, Chore[]> = { overdue: [], today: [], upcoming: [], done: [] }
     for (const c of visible) {
       const group = groupOf(c)
       if (group === 'done' && new Date(c.done_at!).getTime() < recentCutoff) continue
+      if (range === 'today' && group === 'upcoming') continue
       g[group].push(c)
     }
     g.done.sort((a, b) => b.done_at!.localeCompare(a.done_at!))
     return g
-  }, [chores, filter, userId])
+  }, [chores, filter, range, userId])
 
   const empty = !isLoading && Object.values(grouped).every((l) => l.length === 0)
 
   return (
     <>
-      <Segmented value={filter} onChange={setFilter}
-        options={[{ v: 'all', label: 'Everyone' }, { v: 'mine', label: 'Mine' }]} />
+      <div className="mb-5 flex flex-wrap gap-2">
+        <Segmented className="" value={range} onChange={setRange}
+          options={[{ v: 'today', label: 'Today' }, { v: 'all', label: 'All' }]} />
+        <Segmented className="" value={filter} onChange={setFilter}
+          options={[{ v: 'all', label: 'Everyone' }, { v: 'mine', label: 'Mine' }]} />
+      </div>
 
       {isLoading && <p className="text-muted">Loading…</p>}
       {empty && (
         <div className="mt-16 text-center">
-          <p className="font-display text-xl">Nothing to do.</p>
+          <p className="font-display text-xl">{range === 'today' ? 'Nothing left for today.' : 'Nothing to do.'}</p>
           <p className="mt-1 text-muted">Add a chore with the + button.</p>
         </div>
       )}
@@ -101,13 +117,14 @@ export function ChoresView({ householdId: hid, members, userId }: {
   )
 }
 
-export function Segmented<T extends string>({ value, onChange, options }: {
+export function Segmented<T extends string>({ value, onChange, options, className = 'mb-5' }: {
   value: T
   onChange: (v: T) => void
   options: { v: T; label: string }[]
+  className?: string
 }) {
   return (
-    <div className="mb-5 inline-flex rounded-xl bg-line/60 p-1 text-sm font-medium">
+    <div className={`${className} inline-flex rounded-xl bg-line/60 p-1 text-sm font-medium`}>
       {options.map((o) => (
         <button key={o.v} onClick={() => onChange(o.v)}
           className={`rounded-lg px-4 py-1.5 transition ${value === o.v ? 'bg-card shadow-sm' : 'text-muted'}`}>
